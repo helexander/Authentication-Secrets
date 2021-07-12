@@ -8,6 +8,7 @@ const passport = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose");
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const FacebookStrategy = require('passport-facebook').Strategy;
+const LinkedInStrategy = require('passport-linkedin-oauth2').Strategy;
 
 const findOrCreate = require("mongoose-findorcreate");
 
@@ -34,6 +35,7 @@ const userSchema = new mongoose.Schema ({
   password: String,
   googleId: String,
   facebookId: String,
+  linkedinId: String,
   secret: String
 });
 
@@ -56,8 +58,8 @@ passport.deserializeUser(function(id, done) {
 
 //Implementation of Google Login
 passport.use(new GoogleStrategy({
-    clientID: process.env.CLIENT_ID,
-    clientSecret: process.env.CLIENT_SECRET,
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackURL: "http://localhost:3000/auth/google/secrets",
     userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
   },
@@ -79,6 +81,23 @@ passport.use(new FacebookStrategy({
     User.findOrCreate({ facebookId: profile.id }, function(err, user) {
       if (err) { return done(err); }
       done(null, user);
+    });
+  }
+));
+
+//Implementation of LinkedIn Login
+passport.use(new LinkedInStrategy({
+  clientID: process.env.LINKEDIN_CLIENT_ID,
+  clientSecret: process.env.LINKEDIN_SECRET,
+  callbackURL: "http://localhost:3000/auth/linkedin/secrets",
+  scope: ['r_emailaddress', 'r_liteprofile'],
+  state: true
+}, function (accessToken, refreshToken, profile, done) {
+  User.findOrCreate({ linkedinId: profile.id }, function (err, user) {
+    if (err)
+      {return done(err);}
+
+    done(null, user);
     });
   }
 ));
@@ -106,6 +125,12 @@ app.get("/auth/facebook", passport.authenticate("facebook"));
 
 //Facebook would redirect users to the secrets URL after it has been approved
 app.get("/auth/facebook/secrets", passport.authenticate('facebook', { successRedirect: '/secrets', failureRedirect: '/login' }));
+
+//Authentication via LinkedIn's servers
+app.get('/auth/linkedin', passport.authenticate('linkedin'));
+
+//LinkedIn login callback
+app.get('/auth/linkedin/secrets', passport.authenticate('linkedin', {successRedirect: '/secrets', failureRedirect: '/login'}));
 
 app.get("/login", function(req, res){
   res.render("login");
